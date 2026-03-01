@@ -1,33 +1,34 @@
 /*
-          +------+                                                                        +------+
-          |  T0  |                                                                        |  T1  |
-          +------+                                                                        +------+
-                  \            +---------+     10Mbps, 1ms        +---------+            /
-       10Mbps, 1ms \           | Rtx0->1 |>>>>>>>>>>>>>>>>>>>>>>>>| Rrx0->1 |           / 10Mbps, 1ms
-                    \          +---------+                        +---------+          /
-                     \        / X                                          X \        /
-                      +------+                                                +------+
-                      |  R0  |                                                |  R1  |
-                      +------+                                                +------+
-                     /        \ X                                          X /        \
-                  X /          +---------+     10Mbps, 100ms      +---------+          \ X
-                   /           | Rrx1->0 |<<<<<<<<<<<<<<<<<<<<<<<<| Rtx1->0 |           \
-           +------+            +---------+                        +---------+            +------+
-           |  N0  |                                                                      |  N1  |
-           +------+            +---------+     10Mbps, 100ms      +---------+            +------+
-                   \           | Rtx2->3 |>>>>>>>>>>>>>>>>>>>>>>>>| Rrx2->3 |           /
-                  X \          +---------+                        +---------+          / X
-                     \        / X                                          X \        /
-                      +------+                                                +------+
-                      |  R2  |                                                |  R3  |
-                      +------+                                                +------+
-                     /        \ X                                          X /        \
-                    /          +---------+     10Mbps, 1ms        +---------+          \
-       10Mbps, 1ms /           | Rrx3->2 |<<<<<<<<<<<<<<<<<<<<<<<<| Rtx3->2 |           \ 10Mbps, 1ms
-                  /            +---------+                        +---------+            \
-          +------+                                                                        +------+
-          |  T2  |                                                                        |  T3  |
-          +------+                                                                        +------+
+          +------+ +------+ |  T0  | |  T1  |
+          +------+ +------+
+                  \            +---------+     10Mbps, 1ms        +---------+ /
+       10Mbps, 1ms \           | Rtx0->1 |>>>>>>>>>>>>>>>>>>>>>>>>| Rrx0->1 | /
+   10Mbps, 1ms
+                    \          +---------+                        +---------+ /
+                     \        / X                                          X \ /
+                      +------+ +------+ |  R0  | |  R1  |
+                      +------+ +------+
+                     /        \ X                                          X / \
+                  X /          +---------+     10Mbps, 100ms      +---------+
+   \ X
+                   /           | Rrx1->0 |<<<<<<<<<<<<<<<<<<<<<<<<| Rtx1->0 | \
+           +------+            +---------+                        +---------+
+   +------+ |  N0  | |  N1  |
+           +------+            +---------+     10Mbps, 100ms      +---------+
+   +------+
+                   \           | Rtx2->3 |>>>>>>>>>>>>>>>>>>>>>>>>| Rrx2->3 | /
+                  X \          +---------+                        +---------+ /
+   X
+                     \        / X                                          X \ /
+                      +------+ +------+ |  R2  | |  R3  |
+                      +------+ +------+
+                     /        \ X                                          X / \
+                    /          +---------+     10Mbps, 1ms        +---------+ \
+       10Mbps, 1ms /           | Rrx3->2 |<<<<<<<<<<<<<<<<<<<<<<<<| Rtx3->2 |
+   \ 10Mbps, 1ms
+                  /            +---------+                        +---------+ \
+          +------+ +------+ |  T2  | |  T3  |
+          +------+ +------+
 
           X = 100Mbps, 1ms
 */
@@ -40,6 +41,7 @@
 #include "ns3/netanim-module.h"
 #include "ns3/network-module.h"
 #include "ns3/point-to-point-module.h"
+#include <iostream>
 #include <string>
 
 using namespace ns3;
@@ -99,6 +101,14 @@ int main(int argc, char *argv[]) {
   std::string scheduler = "default";
   bool sack = true;
   bool weak_host = false;
+  CommandLine cmd;
+  cmd.AddValue("cc", "congestion control algo. LIA default", congestionControl);
+
+  cmd.AddValue("sch", "schedular for mptcp. minRTT default", scheduler);
+
+  cmd.Parse(argc, argv);
+
+  std::cout << scheduler << std::endl;
 
   DceManagerHelper dceManager;
   dceManager.SetTaskManagerAttribute("FiberManagerType",
@@ -140,15 +150,15 @@ int main(int argc, char *argv[]) {
   // Connecting N0 - R0
   NetDeviceContainer n0r0 = pointToPoint.Install(N0, R0);
   r0addr.Assign(n0r0);
-  
+
   // Connecting N0 - R2
   NetDeviceContainer n0r2 = pointToPoint.Install(N0, R2);
   r2addr.Assign(n0r2);
-  
+
   // Connecting N1 - R1
   NetDeviceContainer n1r1 = pointToPoint.Install(N1, R1);
   r1addr.Assign(n1r1);
-  
+
   // Connecting N1 - R1
   NetDeviceContainer n1r3 = pointToPoint.Install(N1, R3);
   r3addr.Assign(n1r3);
@@ -225,95 +235,153 @@ int main(int argc, char *argv[]) {
   NetDeviceContainer rtx32rrx32 = pointToPoint.Install(Rtx32, Rrx32);
   r3addr.Assign(rtx32rrx32);
 
-  if (weak_host){
+  if (weak_host) {
     // Filling routing table for N0
-    LinuxStackHelper::RunIp(N0, Seconds(0.2), "route add 10.1.0.1/32 via 10.0.0.1 dev sim0");
-    LinuxStackHelper::RunIp(N0, Seconds(0.2), "route add 10.3.0.1/32 via 10.2.0.1 dev sim1");
+    LinuxStackHelper::RunIp(N0, Seconds(0.2),
+                            "route add 10.1.0.1/32 via 10.0.0.1 dev sim0");
+    LinuxStackHelper::RunIp(N0, Seconds(0.2),
+                            "route add 10.3.0.1/32 via 10.2.0.1 dev sim1");
 
     // Filling routing table for N1
-    LinuxStackHelper::RunIp(N1, Seconds(0.2), "route add 10.0.0.1/32 via 10.1.0.1 dev sim0");
-    LinuxStackHelper::RunIp(N1, Seconds(0.2), "route add 10.2.0.1/32 via 10.3.0.1 dev sim1");
+    LinuxStackHelper::RunIp(N1, Seconds(0.2),
+                            "route add 10.0.0.1/32 via 10.1.0.1 dev sim0");
+    LinuxStackHelper::RunIp(N1, Seconds(0.2),
+                            "route add 10.2.0.1/32 via 10.3.0.1 dev sim1");
   } else {
 
-    LinuxStackHelper::RunIp(N0, Seconds(0.2), "rule add from 10.0.0.1 lookup 10");
+    LinuxStackHelper::RunIp(N0, Seconds(0.2),
+                            "rule add from 10.0.0.1 lookup 10");
     LinuxStackHelper::RunIp(N0, Seconds(0.2), "rule add to 10.1.0.1 lookup 10");
-    LinuxStackHelper::RunIp(N0, Seconds(0.2), "route add default via 10.0.0.2 dev sim0 table 10");
+    LinuxStackHelper::RunIp(N0, Seconds(0.2),
+                            "route add default via 10.0.0.2 dev sim0 table 10");
 
-    LinuxStackHelper::RunIp(N0, Seconds(0.2), "rule add from 10.2.0.1 lookup 20");
+    LinuxStackHelper::RunIp(N0, Seconds(0.2),
+                            "rule add from 10.2.0.1 lookup 20");
     LinuxStackHelper::RunIp(N0, Seconds(0.2), "rule add to 10.3.0.1 lookup 20");
-    LinuxStackHelper::RunIp(N0, Seconds(0.2), "route add default via 10.2.0.2 dev sim1 table 20");
+    LinuxStackHelper::RunIp(N0, Seconds(0.2),
+                            "route add default via 10.2.0.2 dev sim1 table 20");
 
     // Policy-Based Routing for N1 (Receiver)
-    LinuxStackHelper::RunIp(N1, Seconds(0.2), "rule add from 10.1.0.1 lookup 10");
+    LinuxStackHelper::RunIp(N1, Seconds(0.2),
+                            "rule add from 10.1.0.1 lookup 10");
     LinuxStackHelper::RunIp(N1, Seconds(0.2), "rule add to 10.0.0.1 lookup 10");
-    LinuxStackHelper::RunIp(N1, Seconds(0.2), "route add default via 10.1.0.2 dev sim0 table 10");
+    LinuxStackHelper::RunIp(N1, Seconds(0.2),
+                            "route add default via 10.1.0.2 dev sim0 table 10");
 
-    LinuxStackHelper::RunIp(N1, Seconds(0.2), "rule add from 10.3.0.1 lookup 20");
+    LinuxStackHelper::RunIp(N1, Seconds(0.2),
+                            "rule add from 10.3.0.1 lookup 20");
     LinuxStackHelper::RunIp(N1, Seconds(0.2), "rule add to 10.2.0.1 lookup 20");
-    LinuxStackHelper::RunIp(N1, Seconds(0.2), "route add default via 10.3.0.2 dev sim1 table 20");
+    LinuxStackHelper::RunIp(N1, Seconds(0.2),
+                            "route add default via 10.3.0.2 dev sim1 table 20");
   }
 
   // Filling routing table for R0
-  LinuxStackHelper::RunIp(R0, Seconds(0.2), "route add 10.0.0.1/32 via 10.0.0.2 dev sim0");
-  LinuxStackHelper::RunIp(R0, Seconds(0.2), "route add 10.0.0.3/32 via 10.0.0.4 dev sim1");
-  LinuxStackHelper::RunIp(R0, Seconds(0.2), "route add 10.1.0.1/32 via 10.0.0.6 dev sim2");
-  LinuxStackHelper::RunIp(R0, Seconds(0.2), "route add 10.1.0.5/32 via 10.0.0.6 dev sim2");
+  LinuxStackHelper::RunIp(R0, Seconds(0.2),
+                          "route add 10.0.0.1/32 via 10.0.0.2 dev sim0");
+  LinuxStackHelper::RunIp(R0, Seconds(0.2),
+                          "route add 10.0.0.3/32 via 10.0.0.4 dev sim1");
+  LinuxStackHelper::RunIp(R0, Seconds(0.2),
+                          "route add 10.1.0.1/32 via 10.0.0.6 dev sim2");
+  LinuxStackHelper::RunIp(R0, Seconds(0.2),
+                          "route add 10.1.0.5/32 via 10.0.0.6 dev sim2");
 
   // Filling routing table for R1
-  LinuxStackHelper::RunIp(R1, Seconds(0.2), "route add 10.0.0.1/32 via 10.1.0.6 dev sim2");
-  LinuxStackHelper::RunIp(R1, Seconds(0.2), "route add 10.0.0.3/32 via 10.1.0.6 dev sim2");
-  LinuxStackHelper::RunIp(R1, Seconds(0.2), "route add 10.1.0.1/32 via 10.1.0.2 dev sim0");
-  LinuxStackHelper::RunIp(R1, Seconds(0.2), "route add 10.1.0.3/32 via 10.1.0.4 dev sim1");
+  LinuxStackHelper::RunIp(R1, Seconds(0.2),
+                          "route add 10.0.0.1/32 via 10.1.0.6 dev sim2");
+  LinuxStackHelper::RunIp(R1, Seconds(0.2),
+                          "route add 10.0.0.3/32 via 10.1.0.6 dev sim2");
+  LinuxStackHelper::RunIp(R1, Seconds(0.2),
+                          "route add 10.1.0.1/32 via 10.1.0.2 dev sim0");
+  LinuxStackHelper::RunIp(R1, Seconds(0.2),
+                          "route add 10.1.0.3/32 via 10.1.0.4 dev sim1");
 
   // Filling routing table for R2
-  LinuxStackHelper::RunIp(R2, Seconds(0.2), "route add 10.2.0.1/32 via 10.2.0.2 dev sim0");
-  LinuxStackHelper::RunIp(R2, Seconds(0.2), "route add 10.2.0.3/32 via 10.2.0.4 dev sim1");
-  LinuxStackHelper::RunIp(R2, Seconds(0.2), "route add 10.3.0.1/32 via 10.2.0.6 dev sim2");
-  LinuxStackHelper::RunIp(R2, Seconds(0.2), "route add 10.3.0.5/32 via 10.2.0.6 dev sim2");
+  LinuxStackHelper::RunIp(R2, Seconds(0.2),
+                          "route add 10.2.0.1/32 via 10.2.0.2 dev sim0");
+  LinuxStackHelper::RunIp(R2, Seconds(0.2),
+                          "route add 10.2.0.3/32 via 10.2.0.4 dev sim1");
+  LinuxStackHelper::RunIp(R2, Seconds(0.2),
+                          "route add 10.3.0.1/32 via 10.2.0.6 dev sim2");
+  LinuxStackHelper::RunIp(R2, Seconds(0.2),
+                          "route add 10.3.0.5/32 via 10.2.0.6 dev sim2");
 
   // Filling routing table for R3
-  LinuxStackHelper::RunIp(R3, Seconds(0.2), "route add 10.2.0.1/32 via 10.3.0.6 dev sim2");
-  LinuxStackHelper::RunIp(R3, Seconds(0.2), "route add 10.2.0.3/32 via 10.3.0.6 dev sim2");
-  LinuxStackHelper::RunIp(R3, Seconds(0.2), "route add 10.3.0.1/32 via 10.3.0.2 dev sim0");
-  LinuxStackHelper::RunIp(R3, Seconds(0.2), "route add 10.3.0.3/32 via 10.3.0.4 dev sim1");
+  LinuxStackHelper::RunIp(R3, Seconds(0.2),
+                          "route add 10.2.0.1/32 via 10.3.0.6 dev sim2");
+  LinuxStackHelper::RunIp(R3, Seconds(0.2),
+                          "route add 10.2.0.3/32 via 10.3.0.6 dev sim2");
+  LinuxStackHelper::RunIp(R3, Seconds(0.2),
+                          "route add 10.3.0.1/32 via 10.3.0.2 dev sim0");
+  LinuxStackHelper::RunIp(R3, Seconds(0.2),
+                          "route add 10.3.0.3/32 via 10.3.0.4 dev sim1");
 
   // Filling routing table for Rtx01
-  LinuxStackHelper::RunIp(Rtx01, Seconds(0.2), "route add 10.1.0.1/32 via 10.0.0.9 dev sim1");
-  LinuxStackHelper::RunIp(Rtx01, Seconds(0.2), "route add 10.1.0.3/32 via 10.0.0.9 dev sim1");
+  LinuxStackHelper::RunIp(Rtx01, Seconds(0.2),
+                          "route add 10.1.0.1/32 via 10.0.0.9 dev sim1");
+  LinuxStackHelper::RunIp(Rtx01, Seconds(0.2),
+                          "route add 10.1.0.3/32 via 10.0.0.9 dev sim1");
 
   // Filling routing table for Rrx01
-  LinuxStackHelper::RunIp(Rrx01, Seconds(0.2), "route add 10.1.0.1/32 via 10.1.0.7 dev sim0");
-  LinuxStackHelper::RunIp(Rrx01, Seconds(0.2), "route add 10.1.0.3/32 via 10.1.0.7 dev sim0");
+  LinuxStackHelper::RunIp(Rrx01, Seconds(0.2),
+                          "route add 10.1.0.1/32 via 10.1.0.7 dev sim0");
+  LinuxStackHelper::RunIp(Rrx01, Seconds(0.2),
+                          "route add 10.1.0.3/32 via 10.1.0.7 dev sim0");
 
   // Filling routing table for Rtx10
-  LinuxStackHelper::RunIp(Rtx10, Seconds(0.2), "route add 10.0.0.1/32 via 10.1.0.9 dev sim1");
-  LinuxStackHelper::RunIp(Rtx10, Seconds(0.2), "route add 10.0.0.3/32 via 10.1.0.9 dev sim1");
+  LinuxStackHelper::RunIp(Rtx10, Seconds(0.2),
+                          "route add 10.0.0.1/32 via 10.1.0.9 dev sim1");
+  LinuxStackHelper::RunIp(Rtx10, Seconds(0.2),
+                          "route add 10.0.0.3/32 via 10.1.0.9 dev sim1");
 
   // Filling routing table for Rrx10
-  LinuxStackHelper::RunIp(Rrx10, Seconds(0.2), "route add 10.0.0.1/32 via 10.0.0.7 dev sim0");
-  LinuxStackHelper::RunIp(Rrx10, Seconds(0.2), "route add 10.0.0.3/32 via 10.0.0.7 dev sim0");
+  LinuxStackHelper::RunIp(Rrx10, Seconds(0.2),
+                          "route add 10.0.0.1/32 via 10.0.0.7 dev sim0");
+  LinuxStackHelper::RunIp(Rrx10, Seconds(0.2),
+                          "route add 10.0.0.3/32 via 10.0.0.7 dev sim0");
 
   // Filling routing table for Rtx23
-  LinuxStackHelper::RunIp(Rtx23, Seconds(0.2), "route add 10.3.0.1/32 via 10.2.0.9 dev sim1");
-  LinuxStackHelper::RunIp(Rtx23, Seconds(0.2), "route add 10.3.0.3/32 via 10.2.0.9 dev sim1");
+  LinuxStackHelper::RunIp(Rtx23, Seconds(0.2),
+                          "route add 10.3.0.1/32 via 10.2.0.9 dev sim1");
+  LinuxStackHelper::RunIp(Rtx23, Seconds(0.2),
+                          "route add 10.3.0.3/32 via 10.2.0.9 dev sim1");
 
   // Filling routing table for Rrx01
-  LinuxStackHelper::RunIp(Rrx01, Seconds(0.2), "route add 10.3.0.1/32 via 10.3.0.7 dev sim0");
-  LinuxStackHelper::RunIp(Rrx01, Seconds(0.2), "route add 10.3.0.3/32 via 10.3.0.7 dev sim0");
+  LinuxStackHelper::RunIp(Rrx01, Seconds(0.2),
+                          "route add 10.3.0.1/32 via 10.3.0.7 dev sim0");
+  LinuxStackHelper::RunIp(Rrx01, Seconds(0.2),
+                          "route add 10.3.0.3/32 via 10.3.0.7 dev sim0");
 
   // Filling routing table for Rtx32
-  LinuxStackHelper::RunIp(Rtx32, Seconds(0.2), "route add 10.2.0.1/32 via 10.3.0.9 dev sim1");
-  LinuxStackHelper::RunIp(Rtx32, Seconds(0.2), "route add 10.2.0.3/32 via 10.3.0.9 dev sim1");
+  LinuxStackHelper::RunIp(Rtx32, Seconds(0.2),
+                          "route add 10.2.0.1/32 via 10.3.0.9 dev sim1");
+  LinuxStackHelper::RunIp(Rtx32, Seconds(0.2),
+                          "route add 10.2.0.3/32 via 10.3.0.9 dev sim1");
 
   // Filling routing table for Rrx32
-  LinuxStackHelper::RunIp(Rrx32, Seconds(0.2), "route add 10.2.0.1/32 via 10.2.0.7 dev sim0");
-  LinuxStackHelper::RunIp(Rrx32, Seconds(0.2), "route add 10.2.0.3/32 via 10.2.0.7 dev sim0");
+  LinuxStackHelper::RunIp(Rrx32, Seconds(0.2),
+                          "route add 10.2.0.1/32 via 10.2.0.7 dev sim0");
+  LinuxStackHelper::RunIp(Rrx32, Seconds(0.2),
+                          "route add 10.2.0.3/32 via 10.2.0.7 dev sim0");
 
   // debug
   stack.SysctlSet(nodes, ".net.mptcp.mptcp_debug", "1");
   stack.SysctlSet(nodes, ".net.ipv4.tcp_congestion_control", congestionControl);
   stack.SysctlSet(nodes, ".net.mptcp.mptcp_scheduler", scheduler);
   stack.SysctlSet(nodes, ".net.ipv4.tcp_sack", sack ? "1" : "0");
+
+  LinuxStackHelper::SysctlGet(N0, Seconds(1),
+                              ".net.ipv4.tcp_available_congestion_control",
+                              &printTcpFlags);
+
+  LinuxStackHelper::SysctlGet(N0, Seconds(1),
+                              ".net.ipv4.tcp_congestion_control",
+                              &printTcpFlags);
+
+  LinuxStackHelper::SysctlGet(N0, Seconds(1),
+                              ".net.mptcp.mptcp_scheduler", &printTcpFlags);
+
+  LinuxStackHelper::SysctlGet(N0, Seconds(1), ".net.ipv4.tcp_sack",
+                              &printTcpFlags);
 
   // data applications
   DceApplicationHelper dce;
@@ -355,7 +423,7 @@ int main(int argc, char *argv[]) {
 
   setPos(R0, 50, 50, 0);
   setPos(R1, 150, 50, 0);
-  setPos(R2, 50,-50 , 0);
+  setPos(R2, 50, -50, 0);
   setPos(R3, 150, -50, 0);
 
   setPos(Rtx01, 75, 75, 0);
