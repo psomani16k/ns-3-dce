@@ -10,7 +10,8 @@ def build(bld):
       bld.build_a_script('dce', needed = ['core', 'internet', 'dce', 'point-to-point', 'csma', 'netanim'],
 				  target='bin/mptcp',
 				  # source=['dce-iperf-multi.cc'],
-				  source=['dce-iperf-mptcp.cc'],
+				  # source=['dce-iperf-mptcp.cc'],
+				  source=['dce-fw-dly-test.cc'],
 #				  linkflags=['-L/usr/local/lib'],
 #				  lib=['foolib']
 				  )
