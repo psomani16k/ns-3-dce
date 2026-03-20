@@ -11,31 +11,32 @@
 
 using namespace ns3;
 
-#define TRAFFIC_BW "3M"
+#define TRAFFIC_BW "480K"
+#define TRAFFIC_START_DLY 0
 
 #define PATH_1_FWBW "5Mbps"
-#define PATH_1_FWDLY "10ms"
-bool PATH_1_FW_TRAFFIC = true;
+#define PATH_1_FWDLY "80ms"
+bool PATH_1_FW_TRAFFIC = false;
 
-#define PATH_1_RVBW "5Mbps"
-#define PATH_1_RVDLY "10ms"
+#define PATH_1_RVBW "500Kbps"
+#define PATH_1_RVDLY "20ms"
 bool PATH_1_RV_TRAFFIC = true;
 
 #define PATH_2_FWBW "5Mbps"
-#define PATH_2_FWDLY "10ms"
-bool PATH_2_FW_TRAFFIC = true;
+#define PATH_2_FWDLY "60ms"
+bool PATH_2_FW_TRAFFIC = false;
 
-#define PATH_2_RVBW "5Mbps"
-#define PATH_2_RVDLY "10ms"
+#define PATH_2_RVBW "500Kbps"
+#define PATH_2_RVDLY "20ms"
 bool PATH_2_RV_TRAFFIC = true;
 
-#define PATH_3_FWBW "5Mbps"
+#define PATH_3_FWBW "1Mbps"
 #define PATH_3_FWDLY "10ms"
-bool PATH_3_FW_TRAFFIC = true;
+bool PATH_3_FW_TRAFFIC = false;
 
-#define PATH_3_RVBW "5Mbps"
-#define PATH_3_RVDLY "10ms"
-bool PATH_3_RV_TRAFFIC = true;
+#define PATH_3_RVBW "100Kbps"
+#define PATH_3_RVDLY "90ms"
+bool PATH_3_RV_TRAFFIC = false;
 
 #define INFINITE_BW "100Mbps"
 #define INFINITE_DLY "1ms"
@@ -128,7 +129,7 @@ int main(int argc, char *argv[]) {
   // SETTING UP ROUTERS
 
   pointToPoint.SetQueue("ns3::DropTailQueue<Packet>", "MaxSize",
-                        StringValue("100p"));
+                        StringValue("50p"));
 
   pointToPoint.SetDeviceAttribute("DataRate", StringValue(INFINITE_BW));
   pointToPoint.SetChannelAttribute("Delay", StringValue(INFINITE_DLY));
@@ -494,10 +495,10 @@ int main(int argc, char *argv[]) {
   DceApplicationHelper dce;
   ApplicationContainer apps;
 
-  int mptcp_run_time = 1;
+  int mptcp_run_time = 50;
   int mptcp_start = 30;
   int mptcp_stop = mptcp_start + mptcp_run_time + 5;
-  int traffic_start = mptcp_start - 5;
+  int traffic_start = mptcp_start + TRAFFIC_START_DLY;
   int traffic_stop = mptcp_stop;
 
   dce.SetStackSize(1 << 24);
