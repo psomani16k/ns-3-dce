@@ -46,17 +46,17 @@
 
 using namespace ns3;
 
-#define PATH_1_FWBW "5Mbps"
-#define PATH_1_FWDLY "100ms" // 10.0.0.1 - 10.1.0.1
+#define PATH_1_FWBW "10Mbps"
+#define PATH_1_FWDLY "50ms"  // 10.0.0.1 - 10.1.0.1
 
 #define PATH_1_RVBW "5Mbps"
-#define PATH_1_RVDLY "100ms" // 10.1.0.1 - 10.0.0.1
+#define PATH_1_RVDLY "250ms" // 10.1.0.1 - 10.0.0.1
 
 #define PATH_2_FWBW "5Mbps"
-#define PATH_2_FWDLY "100ms"
+#define PATH_2_FWDLY "150ms"
 
 #define PATH_2_RVBW "5Mbps"
-#define PATH_2_RVDLY "500ms"
+#define PATH_2_RVDLY "50ms"
 
 #define INFINITE_BW "100Mbps"
 #define INFINITE_DLY "1ms"

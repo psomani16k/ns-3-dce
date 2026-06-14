@@ -11,35 +11,87 @@
 
 using namespace ns3;
 
-#define TRAFFIC_BW "480K"
-#define TRAFFIC_START_DLY 0
+// #define MPTCP_RUNTIME 70
+//
+// #define TRAFFIC_BW "480K"
+// #define TRAFFIC_START_DLY 10
+//
+// #define PATH_1_FWBW "6Mbps"
+// #define PATH_1_FWDLY "50ms"
+// bool PATH_1_FW_TRAFFIC = false;
+//
+// #define PATH_1_RVBW "500Kbps"
+// #define PATH_1_RVDLY "50ms"
+// bool PATH_1_RV_TRAFFIC = false;
+//
+// #define PATH_2_FWBW "4Mbps"
+// #define PATH_2_FWDLY "80ms"
+// bool PATH_2_FW_TRAFFIC = false;
+//
+// #define PATH_2_RVBW "500Kbps"
+// #define PATH_2_RVDLY "10ms"
+// bool PATH_2_RV_TRAFFIC = false;
+//
+// #define PATH_3_FWBW "8Mbps"
+// #define PATH_3_FWDLY "10ms"
+// bool PATH_3_FW_TRAFFIC = false;
+//
+// #define PATH_3_RVBW "500Kbps"
+// #define PATH_3_RVDLY "250ms"
+// bool PATH_3_RV_TRAFFIC = false;
+//
+// #define INFINITE_BW "100Mbps"
+// #define INFINITE_DLY "1ms"
+#define MPTCP_RUNTIME 60
 
-#define PATH_1_FWBW "5Mbps"
-#define PATH_1_FWDLY "80ms"
+// Cross-traffic: 820Kbps on a 1Mbps reverse bottleneck → ~95% utilisation (including ACKs),
+// M/G/1 queuing ≈ 103ms delay for ACKs → RTT(P1_congested) ≈ 113ms.
+// Starts 10 s into MPTCP so subflows are fully established before congestion hits.
+#define TRAFFIC_BW "820Kbps"
+#define TRAFFIC_START_DLY 10
+
+// PATH 1: BEST forward path — high BW (10Mbps), lowest one-way delay (5ms).
+//         Reverse bottleneck is 1Mbps; 820Kbps cross-traffic loads it to ~95%,
+//         producing ~103ms queuing → RTT(P1_congested) ≈ 113ms.
+//         weighted_delay sees fwd=5ms   → correctly PREFERS P1 (highest throughput).
+//         minRTT      sees RTT ≈ 113ms → incorrectly AVOIDS P1.
+#define PATH_1_FWBW "10Mbps"
+#define PATH_1_FWDLY "5ms"
 bool PATH_1_FW_TRAFFIC = false;
 
-#define PATH_1_RVBW "500Kbps"
-#define PATH_1_RVDLY "20ms"
+#define PATH_1_RVBW "1Mbps"
+#define PATH_1_RVDLY "5ms"
 bool PATH_1_RV_TRAFFIC = true;
 
-#define PATH_2_FWBW "5Mbps"
-#define PATH_2_FWDLY "60ms"
+// PATH 2: MEDIUM — 4Mbps forward, 35ms delay; clean reverse (5Mbps, 15ms).
+//         RTT(P2) ≈ 50ms. Clear middle ground: minRTT prefers it over P1 but not P3;
+//         weighted_delay uses it as second choice after P1.
+#define PATH_2_FWBW "4Mbps"
+#define PATH_2_FWDLY "35ms"
 bool PATH_2_FW_TRAFFIC = false;
 
-#define PATH_2_RVBW "500Kbps"
-#define PATH_2_RVDLY "20ms"
-bool PATH_2_RV_TRAFFIC = true;
+#define PATH_2_RVBW "5Mbps"
+#define PATH_2_RVDLY "15ms"
+bool PATH_2_RV_TRAFFIC = false;
 
-#define PATH_3_FWBW "1Mbps"
-#define PATH_3_FWDLY "10ms"
+// PATH 3: HIGH DELAY forward — 6Mbps BW, 80ms one-way delay.
+//         Pristine reverse (100Mbps, 1ms) → RTT(P3) ≈ 81ms.
+//         CWND = 81ms × 6Mbps / (1500B × 8) ≈ 40 segments — large enough to absorb real traffic.
+//         minRTT      sees RTT ≈ 81ms  → PREFERS P3 over P1 (P1 RTT ≈ 113ms).
+//         weighted_delay sees fwd=80ms → correctly AVOIDS P3 in favour of P1 (fwd=5ms).
+//         This creates the measurable divergence: minRTT uses P2+P3 (~10Mbps),
+//         weighted_delay uses P1+P2 (~14Mbps).
+#define PATH_3_FWBW "6Mbps"
+#define PATH_3_FWDLY "80ms"
 bool PATH_3_FW_TRAFFIC = false;
 
-#define PATH_3_RVBW "100Kbps"
-#define PATH_3_RVDLY "90ms"
+#define PATH_3_RVBW "100Mbps"
+#define PATH_3_RVDLY "1ms"
 bool PATH_3_RV_TRAFFIC = false;
 
 #define INFINITE_BW "100Mbps"
 #define INFINITE_DLY "1ms"
+
 
 #define N0 nodes.Get(0)       // 0
 #define N1 nodes.Get(1)       // 1
@@ -89,7 +141,7 @@ int main(int argc, char *argv[]) {
   CommandLine cmd;
   cmd.AddValue("cc", "congestion control algo. LIA default", congestionControl);
 
-  cmd.AddValue("sch", "schedular for mptcp. minRTT default", scheduler);
+  cmd.AddValue("sch", "scheduler for mptcp. Options: default (minRTT), weighted_delay, roundrobin, rbp (RBP+minRTT), rbp_fwd (RBP+forward-delay)", scheduler);
 
   cmd.Parse(argc, argv);
 
@@ -495,7 +547,7 @@ int main(int argc, char *argv[]) {
   DceApplicationHelper dce;
   ApplicationContainer apps;
 
-  int mptcp_run_time = 50;
+  int mptcp_run_time = MPTCP_RUNTIME;
   int mptcp_start = 30;
   int mptcp_stop = mptcp_start + mptcp_run_time + 5;
   int traffic_start = mptcp_start + TRAFFIC_START_DLY;
